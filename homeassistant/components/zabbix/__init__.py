@@ -16,11 +16,14 @@ from zabbix_utils import ItemValue, Sender, ZabbixAPI
 from zabbix_utils.exceptions import APIRequestError, ProcessingError
 
 from homeassistant.const import (
-    CONF_HOST,
-    CONF_PASSWORD,
-    CONF_PATH,
-    CONF_SSL,
     CONF_USERNAME,
+    CONF_PASSWORD,
+    CONF_SERVER_HOST,
+    CONF_SERVER_PORT,
+    CONF_API_HOST,
+    CONF_API_PATH,
+    CONF_API_SSL,
+    CONF_API_PORT,
     EVENT_HOMEASSISTANT_STOP,
     EVENT_STATE_CHANGED,
     STATE_UNAVAILABLE,
@@ -45,9 +48,9 @@ _LOGGER = logging.getLogger(__name__)
 CONF_PUBLISH_STATES_HOST = "publish_states_host"
 CONF_PUBLISH_STRING_STATES = "publish_string_states"
 
-DEFAULT_SSL = False
-DEFAULT_PATH = "zabbix"
-DEFAULT_SENDER_PORT = 10051
+DEFAULT_API_SSL = False
+DEFAULT_API_PATH = "zabbix"
+DEFAULT_SERVER_PORT = 10051
 
 TIMEOUT = 5
 RETRY_DELAY = 20
@@ -62,11 +65,14 @@ CONFIG_SCHEMA = vol.Schema(
     {
         DOMAIN: INCLUDE_EXCLUDE_BASE_FILTER_SCHEMA.extend(
             {
-                vol.Required(CONF_HOST): cv.string,
-                vol.Optional(CONF_PASSWORD): cv.string,
-                vol.Optional(CONF_PATH, default=DEFAULT_PATH): cv.string,
-                vol.Optional(CONF_SSL, default=DEFAULT_SSL): cv.boolean,
                 vol.Optional(CONF_USERNAME): cv.string,
+                vol.Optional(CONF_PASSWORD): cv.string,
+                vol.Required(CONF_SERVER_HOST): cv.string,
+                vol.Optional(CONF_SERVER_PORT, default=DEFAULT_SERVER_PORT): cv.string,
+                vol.Optional(CONF_API_HOST, default=CONF_SERVER_HOST): cv.string,
+                vol.Optional(CONF_API_PATH, default=DEFAULT_API_PATH): cv.string,
+                vol.Optional(CONF_API_SSL, default=DEFAULT_API_SSL): cv.boolean,
+                vol.Optional(CONF_API_PORT): cv.string,
                 vol.Optional(CONF_PUBLISH_STATES_HOST): cv.string,
                 vol.Optional(CONF_PUBLISH_STRING_STATES, default=False): cv.boolean,
             }
@@ -80,9 +86,10 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Zabbix component."""
 
     conf = config[DOMAIN]
-    protocol = "https" if conf[CONF_SSL] else "http"
+    protocol = "https" if conf[CONF_API_SSL] else "http"
+    port = ":{conf[CONF_API_PORT}" if conf[CONF_API_PORT] else ""
 
-    url = urljoin(f"{protocol}://{conf[CONF_HOST]}", conf[CONF_PATH])
+    url = urljoin(f"{protocol}://{conf[CONF_API_HOST]}{port}", conf[CONF_API_PATH])
     username = conf.get(CONF_USERNAME)
     password = conf.get(CONF_PASSWORD)
 
@@ -182,7 +189,7 @@ def setup(hass: HomeAssistant, config: ConfigType) -> bool:
         return metrics
 
     if publish_states_host:
-        zabbix_sender = Sender(server=conf[CONF_HOST], port=DEFAULT_SENDER_PORT)
+        zabbix_sender = Sender(server=conf[CONF_SERVER_HOST], port=conf[CONF_SERVER_PORT])
         instance = ZabbixThread(zabbix_sender, event_to_metrics)
         instance.setup(hass)
 
